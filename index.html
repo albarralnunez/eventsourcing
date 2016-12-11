@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Eventsourcing by johnbywater</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Eventsourcing</h1>
+      <h2 class="project-tagline">Event sourcing in Python</h2>
+      <a href="https://github.com/johnbywater/eventsourcing" class="btn">View on GitHub</a>
+      <a href="https://github.com/johnbywater/eventsourcing/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/johnbywater/eventsourcing/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1>
+<a id="event-sourcing-in-python" class="anchor" href="#event-sourcing-in-python" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Event Sourcing in Python</h1>
+
+<p><a href="https://travis-ci.org/johnbywater/eventsourcing"><img src="https://secure.travis-ci.org/johnbywater/eventsourcing.png?branch=develop" alt="Build Status"></a></p>
+
+<p>A library for event sourcing in Python.</p>
+
+<h2>
+<a id="features" class="anchor" href="#features" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Features</h2>
+
+<p><strong>Domain Events, Entities, Repositories, and Subscribers</strong> — Base classes
+make it easy to develop new applications with custom entities, custom
+repositories, custom domain events, custom subscribers, custom
+transcoders, custom stored event repositories, custom snapshotting
+mechanism. See example below, and the package's test suite.</p>
+
+<p><strong>Event Store</strong> — With extendable set of stored event repositories
+for adapting different ORMs and databases systems (e.g. Cassandra,
+SQLAlchemy). Includes an in-memory stored event
+repository implemented with simple Python objects. If your
+database system isn't already supported, it will be easy to adapt
+with a custom stored event repository.</p>
+
+<p><strong>Event Player with Snapshots</strong> — Avoid replaying an entire event stream to obtain the
+current state of an entity. Makes entity access constant time,
+rather than proportional to the number of events. Snapshotting is
+implemented as a strategy object in the application class, making it
+easy to use a custom snapshotting mechanism and storage. A snapshot
+strategy is included which reuses the capabilities of this library by
+implementing snapshots as domain events.</p>
+
+<p><strong>Fast Forwarding</strong> — Of entities to latest published event, used with
+snapshots and also when optimistic currency control exceptions are
+encountered.</p>
+
+<p><strong>Optimistic Concurrency Control</strong> — Implemented using optimistic
+concurrency controls in the adapted database. For example, with
+Cassandra this accomplishes linearly-scalable distributed optimistic
+concurrency control, guaranteeing sequential consistency of each
+event stream, across a distributed application. It is also possible to
+serialize the execution of commands on an aggregate, but that is out
+of the scope of this package. If you wish to do that, perhaps something
+like <a href="https://zookeeper.apache.org/">Zookeeper</a> might help.</p>
+
+<p><strong>Application-Level Encryption</strong> — Symmetric encryption of all stored
+events, including snapshots and logged messages, using a customizable
+cipher. Can optionally be applied to encrypt particular events, or all
+stored events, or not applied at all (the default). Included is an AES
+cipher, by default in CBC mode with 128 bit blocksize, that uses a 16
+byte encryption key passed in at run time, and which generates a
+unique 16 byte initialization vector for each encryption. Data is
+compressed before it is encrypted, which can mean application
+performance is improved when encryption is enabled.</p>
+
+<p><strong>Time-Bucketed Logs</strong> — Provide a way of writing an indefinitely long
+stream of events in a highly scalable manner. Includes log objects,
+logged message events and a log reader implemented as a generator that
+can span across many many buckets. For example, a domain event log
+that allows all stored events in an application to be logged in
+a linearly scalable manner, and then retrieved in order, limited by
+number, from any point in time until another point in time, in reverse
+or ascending order.</p>
+
+<p><strong>Notification Logs</strong> - Provide a way of reading an indefinitely long
+sequence of events in a highly scalable manner. Includes a notification
+logger that writes an event sourced log that can be indexed with a
+contiguous integer sequence, and a log reader implemented as a generator
+that selects a part of a sequence using Python's list slice syntax.</p>
+
+<p><strong>Customizable Transcoding</strong> — Between domain events and stored events,
+allows support to be added for serialization and deserialization of
+custom value object types, and also makes it possible to use different
+database schemas when developing a custom stored event repository.</p>
+
+<p><strong>Synchronous Publish-Subscribe Mechanism</strong> — Entirely deterministic,
+with handlers called in the order they are registered, and with which
+calls to publish events do not return until all event subscribers have
+returned.</p>
+
+<p><strong>Worked Examples</strong> — A simple worked example application, with example
+entity class, event sourced repository, and factory method (see below).
+Also included is a slightly more sophisticated version of the
+example application below.</p>
+
+<p><strong>Collections</strong> — Event sourced collections, for modelling different
+kinds of multiplicity.</p>
+
+<h2>
+<a id="install" class="anchor" href="#install" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Install</h2>
+
+<p>Use pip to install the <a href="https://pypi.python.org/pypi/eventsourcing">latest distribution</a> from
+the Python Package Index.</p>
+
+<pre><code>pip install eventsourcing
+</code></pre>
+
+<p>If you want to run the test suite, or try the example below, then
+please install with the optional extra called 'test'.</p>
+
+<pre><code>pip install eventsourcing[test]
+</code></pre>
+
+<p>After installing with the 'test' optional extra, the test suite should
+pass.</p>
+
+<pre><code>python -m unittest discover eventsourcing.tests -v
+</code></pre>
+
+<p>Please register any issues you find.</p>
+
+<ul>
+<li><a href="https://github.com/johnbywater/eventsourcing/issues">https://github.com/johnbywater/eventsourcing/issues</a></li>
+</ul>
+
+<p>There is also a mailing list.</p>
+
+<ul>
+<li><a href="https://groups.google.com/forum/#!forum/eventsourcing-users">https://groups.google.com/forum/#!forum/eventsourcing-users</a></li>
+</ul>
+
+<h2>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Usage</h2>
+
+<p>Start by opening a new Python file in your favourite editor, or start
+a new project in your favourite IDE (I've been using PyCharm for this
+code).</p>
+
+<p>Start writing yourself a new event sourced entity class, by making a
+subclass of 'EventSourcedEntity' (from module
+'eventsourcing.domain.model.entity').</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.domain.model.entity <span class="pl-k">import</span> EventSourcedEntity, mutableproperty
+
+
+<span class="pl-k">class</span> <span class="pl-en">Example</span>(<span class="pl-e">EventSourcedEntity</span>):
+    <span class="pl-s"><span class="pl-pds">"""</span>An example of an event sourced entity class.<span class="pl-pds">"""</span></span>
+</pre></div>
+
+<p>The entity class domain events must be defined on the domain entity
+class. In the example below, an 'Example' entity defines 'Created',
+'AttributeChanged', and 'Discarded' events. Add these events to your
+entity class.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.domain.model.entity <span class="pl-k">import</span> EventSourcedEntity, mutableproperty
+
+
+<span class="pl-k">class</span> <span class="pl-en">Example</span>(<span class="pl-e">EventSourcedEntity</span>):
+    <span class="pl-s"><span class="pl-pds">"""</span>An example of an event sourced entity class.<span class="pl-pds">"""</span></span>
+
+    <span class="pl-k">class</span> <span class="pl-en">Created</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">Created</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-k">class</span> <span class="pl-en">AttributeChanged</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">AttributeChanged</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-k">class</span> <span class="pl-en">Discarded</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">Discarded</span>):
+        <span class="pl-k">pass</span>
+</pre></div>
+
+<p>When are these events published? The 'Created' event is published by a
+factory method (see below), its values are used to initialise an
+entity. The 'Discarded' event is published by the discard() method,
+which is defined on class 'EventSourcedEntity'.</p>
+
+<p>The 'mutableproperty' decorator is used to define mutable properties
+'a' and 'b'. The decorator introduces a setter that generates
+'AttributeChanged' events when values are assigned to the properties.</p>
+
+<p>Add the two mutable properties 'a' and 'b' to your entity class.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.domain.model.entity <span class="pl-k">import</span> EventSourcedEntity, mutableproperty
+
+
+<span class="pl-k">class</span> <span class="pl-en">Example</span>(<span class="pl-e">EventSourcedEntity</span>):
+    <span class="pl-s"><span class="pl-pds">"""</span>An example of an event sourced entity class.<span class="pl-pds">"""</span></span>
+
+    <span class="pl-k">class</span> <span class="pl-en">Created</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">Created</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-k">class</span> <span class="pl-en">AttributeChanged</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">AttributeChanged</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-k">class</span> <span class="pl-en">Discarded</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">Discarded</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-en">@mutableproperty</span>
+    <span class="pl-k">def</span> <span class="pl-en">a</span>(<span class="pl-smi"><span class="pl-smi">self</span></span>):
+        <span class="pl-k">return</span> <span class="pl-v">self</span>._a
+
+    <span class="pl-en">@mutableproperty</span>
+    <span class="pl-k">def</span> <span class="pl-en">b</span>(<span class="pl-smi"><span class="pl-smi">self</span></span>):
+        <span class="pl-k">return</span> <span class="pl-v">self</span>._b</pre></div>
+
+<p>That's everything you need to publish domain events. How are they
+applied?</p>
+
+<p>The entity class inherits a mutator method that is capable of handling
+those events. For example, when a 'Created' event is handled by the
+mutator, the attribute values of the Created event object are passed
+into the entity class constructor. A factory method will instantiate a
+Created event with the attribute values expected by the entity class
+constructor.</p>
+
+<p>Add a constructor to your entity class which takes two positional
+arguments ('a' and 'b') and keyword arguments ('kwargs') which it
+passes through to the base class constructor.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.domain.model.entity <span class="pl-k">import</span> EventSourcedEntity, mutableproperty
+
+
+<span class="pl-k">class</span> <span class="pl-en">Example</span>(<span class="pl-e">EventSourcedEntity</span>):
+    <span class="pl-s"><span class="pl-pds">"""</span>An example of an event sourced entity class.<span class="pl-pds">"""</span></span>
+
+    <span class="pl-k">class</span> <span class="pl-en">Created</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">Created</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-k">class</span> <span class="pl-en">AttributeChanged</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">AttributeChanged</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-k">class</span> <span class="pl-en">Discarded</span>(<span class="pl-e">EventSourcedEntity</span>.<span class="pl-e">Discarded</span>):
+        <span class="pl-k">pass</span>
+
+    <span class="pl-k">def</span> <span class="pl-c1">__init__</span>(<span class="pl-smi"><span class="pl-smi">self</span></span>, <span class="pl-smi">a</span>, <span class="pl-smi">b</span>, <span class="pl-k">**</span><span class="pl-smi">kwargs</span>):
+        <span class="pl-c1">super</span>(Example, <span class="pl-v">self</span>).<span class="pl-c1">__init__</span>(<span class="pl-k">**</span>kwargs)
+        <span class="pl-v">self</span>._a <span class="pl-k">=</span> a
+        <span class="pl-v">self</span>._b <span class="pl-k">=</span> b
+
+    <span class="pl-en">@mutableproperty</span>
+    <span class="pl-k">def</span> <span class="pl-en">a</span>(<span class="pl-smi"><span class="pl-smi">self</span></span>):
+        <span class="pl-k">return</span> <span class="pl-v">self</span>._a
+
+    <span class="pl-en">@mutableproperty</span>
+    <span class="pl-k">def</span> <span class="pl-en">b</span>(<span class="pl-smi"><span class="pl-smi">self</span></span>):
+        <span class="pl-k">return</span> <span class="pl-v">self</span>._b
+</pre></div>
+
+<p>Next, define a factory method that returns new entity instances. Rather
+than directly constructing the entity object instance, it should
+firstly instantiate a 'Created' domain event, and then call the mutator
+to obtain an entity object. The factory method then publishes the event
+(for example, so that it might be saved into the event store by the
+persistence subscriber). Finally it returns the entity to the caller.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.domain.model.events <span class="pl-k">import</span> publish
+<span class="pl-k">import</span> uuid
+
+<span class="pl-k">def</span> <span class="pl-en">register_new_example</span>(<span class="pl-smi">a</span>, <span class="pl-smi">b</span>):
+    entity_id <span class="pl-k">=</span> uuid.uuid4().hex
+    event <span class="pl-k">=</span> Example.Created(<span class="pl-v">entity_id</span><span class="pl-k">=</span>entity_id, <span class="pl-v">a</span><span class="pl-k">=</span>a, <span class="pl-v">b</span><span class="pl-k">=</span>b)
+    entity <span class="pl-k">=</span> Example.mutate(<span class="pl-v">event</span><span class="pl-k">=</span>event)
+    publish(<span class="pl-v">event</span><span class="pl-k">=</span>event)
+    <span class="pl-k">return</span> entity</pre></div>
+
+<p>That's everything needed to create new entities. How can existing
+entities be obtained? Entities are retrieved from repositories.</p>
+
+<p>Define an event sourced repository class for your entity. Inherit from
+eventsourcing.infrastructure.event_sourced_repo.EventSourcedRepository
+and set the 'domain_class' attribute on the subclass.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.infrastructure.event_sourced_repo <span class="pl-k">import</span> EventSourcedRepository
+
+<span class="pl-k">class</span> <span class="pl-en">ExampleRepository</span>(<span class="pl-e">EventSourcedRepository</span>):
+
+    domain_class <span class="pl-k">=</span> Example</pre></div>
+
+<p>Application objects are used to bind domain and infrastructure. This
+normally involves having some kind of stored event repository suitable
+for the database system you want to use. The stored event repository is
+used by the event store, which is used by both the persistence
+subscriber to make events durable, and by event players in repositories
+to get the events for an entity that has been requested.</p>
+
+<p>Please note, for convenience when using SQLAlchemy or Cassandra to
+store events, two application sub-classes are provided:
+'EventSourcingWithSQLAlchemy' and 'EventSourcingWithCassandra'.</p>
+
+<p>Add an application class, inheriting from 'EventSourcingWithSQLAlchemy',
+that has an event sourced repo. This inheritance provides a
+persistence subscriber, an event store, and a stored event repository
+that works with SQLAlchemy.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.application.with_sqlalchemy <span class="pl-k">import</span> EventSourcingWithSQLAlchemy
+
+<span class="pl-k">class</span> <span class="pl-en">ExampleApplication</span>(<span class="pl-e">EventSourcingWithSQLAlchemy</span>):
+
+    <span class="pl-k">def</span> <span class="pl-c1">__init__</span>(<span class="pl-smi"><span class="pl-smi">self</span></span>, <span class="pl-k">**</span><span class="pl-smi">kwargs</span>):
+        <span class="pl-c1">super</span>(ExampleApplication, <span class="pl-v">self</span>).<span class="pl-c1">__init__</span>(<span class="pl-k">**</span>kwargs)
+        <span class="pl-v">self</span>.example_repo <span class="pl-k">=</span> ExampleRepository(
+            <span class="pl-v">event_store</span><span class="pl-k">=</span><span class="pl-v">self</span>.event_store,
+        )
+</pre></div>
+
+<p>For simplicity, this application has just one type of entity. A more
+realistic application may involve several different types of entity,
+several factory methods, several entity repositories, and different
+event sourced projections (mutator funtions).</p>
+
+<p>As shown below, an event sourced application object can be used as a
+context manager, which closes the application at the end of the block.</p>
+
+<p>The 'db_uri' arg is used in the application constructor to configure
+the database connection. And also a True value for arg 'enable_occ' is
+given, so that optimistic concurrency control  is enabled. If you
+aren't developing a distributed (or otherwise concurrent and
+potentially contentious) application, you don't need to
+enable optimistic concurrency control.</p>
+
+<p>With an instance of the example application, call the factory method
+register_new_entity() to register a new entity. Then, update an
+attribute value by assigning a value. Use the generated entity ID to
+subsequently retrieve the registered entity from the repository. Check
+the changed attribute value has been stored. Discard the entity and see
+that the repository gives a key error when an attempt is made to obtain
+the entity after it has been discarded:</p>
+
+<div class="highlight highlight-source-python"><pre>db_uri <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">'</span>sqlite:///:memory:<span class="pl-pds">'</span></span>
+<span class="pl-k">with</span> ExampleApplication(<span class="pl-v">db_uri</span><span class="pl-k">=</span>db_uri, <span class="pl-v">enable_occ</span><span class="pl-k">=</span><span class="pl-c1">True</span>) <span class="pl-k">as</span> app:
+
+    <span class="pl-c"># Register a new example.</span>
+    example1 <span class="pl-k">=</span> register_new_example(<span class="pl-v">a</span><span class="pl-k">=</span><span class="pl-c1">1</span>, <span class="pl-v">b</span><span class="pl-k">=</span><span class="pl-c1">2</span>)
+
+    <span class="pl-c"># Check the example is available in the repo.</span>
+    <span class="pl-k">assert</span> example1.id <span class="pl-k">in</span> app.example_repo
+
+    <span class="pl-c"># Check the attribute values.</span>
+    entity1 <span class="pl-k">=</span> app.example_repo[example1.id]
+    <span class="pl-k">assert</span> entity1.a <span class="pl-k">==</span> <span class="pl-c1">1</span>
+    <span class="pl-k">assert</span> entity1.b <span class="pl-k">==</span> <span class="pl-c1">2</span>
+
+    <span class="pl-c"># Change attribute values.</span>
+    entity1.a <span class="pl-k">=</span> <span class="pl-c1">123</span>
+    entity1.b <span class="pl-k">=</span> <span class="pl-c1">234</span>
+
+    <span class="pl-c"># Check the new values are available in the repo.</span>
+    entity1 <span class="pl-k">=</span> app.example_repo[example1.id]
+    <span class="pl-k">assert</span> entity1.a <span class="pl-k">==</span> <span class="pl-c1">123</span>
+    <span class="pl-k">assert</span> entity1.b <span class="pl-k">==</span> <span class="pl-c1">234</span>
+
+    <span class="pl-c"># Discard the entity.</span>
+    entity1.discard()
+
+    <span class="pl-k">assert</span> example1.id <span class="pl-k">not</span> <span class="pl-k">in</span> app.example_repo
+
+    <span class="pl-c"># Getting a discarded entity from the repo causes a KeyError.</span>
+    <span class="pl-k">try</span>:
+        app.example_repo[example1.id]
+    <span class="pl-k">except</span> <span class="pl-c1">KeyError</span>:
+        <span class="pl-k">pass</span>
+    <span class="pl-k">else</span>:
+        <span class="pl-k">assert</span> <span class="pl-c1">False</span></pre></div>
+
+<p>Congratulations! You have created a new event sourced application.</p>
+
+<p>If you wanted also to enable application-level encryption, pass in a
+cipher, and a True value for 'always_encrypt_stored_events'. With
+application level encryption, your data below the application will
+be encrypted at rest and in transit, which can help prevent data loss.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">from</span> eventsourcing.domain.services.cipher <span class="pl-k">import</span> AESCipher
+
+cipher <span class="pl-k">=</span> AESCipher(<span class="pl-v">aes_key</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>0123456789abcdef<span class="pl-pds">'</span></span>)
+
+<span class="pl-k">with</span> ExampleApplication(<span class="pl-v">db_uri</span><span class="pl-k">=</span>db_uri, <span class="pl-v">enable_occ</span><span class="pl-k">=</span><span class="pl-c1">True</span>, <span class="pl-v">cipher</span><span class="pl-k">=</span>cipher,
+                        <span class="pl-v">always_encrypt_stored_events</span><span class="pl-k">=</span><span class="pl-c1">True</span>):
+
+    <span class="pl-c"># Register a new example.</span>
+    example1 <span class="pl-k">=</span> register_new_example(<span class="pl-v">a</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>secret data<span class="pl-pds">'</span></span>, <span class="pl-v">b</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>more secrets<span class="pl-pds">'</span></span>)
+
+</pre></div>
+
+<p>If you want to model other domain events, then simply declare them on
+the entity class like the events above, and implement methods on the
+entity which instantiate those domain events, apply them to the entity,
+publish to subscribers. Add mutator functions to apply the domain
+events to the entity objects, for example by directly changing the
+internal state of the entity. See the beat_heart() method on the
+extended example application included in this distribution.</p>
+
+<p>The example above uses an SQLite in memory relational database, but you
+could change 'db_uri' to another connection string if you have a real
+database. Here are some example connection strings - for an SQLite file,
+for a PostgreSQL database, and for a MySQL database. See SQLAlchemy's
+create_engine() documentation for details.</p>
+
+<pre><code>sqlite:////tmp/mydatabase
+
+postgresql://scott:tiger@localhost:5432/mydatabase
+
+mysql://scott:tiger@hostname/dbname
+</code></pre>
+
+<p>Todo: Develop above to be a tutorial.</p>
+
+<h3>
+<a id="upgrading-from-10x-to-11x" class="anchor" href="#upgrading-from-10x-to-11x" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Upgrading From 1.0.x to 1.1.x</h3>
+
+<p>You don't need to do anything. However before using the new optimistic concurrency controls
+you will need to migrate an existing database schema to have the new 'entity_versions' table,
+and you will also need to add a record to that table for each stored event. See notes in doc
+string of EventSourcingApplication class for a zero-downtime migration approach.</p>
+
+<p>To enable optimistic concurrency control, set the application constructor argument named
+'enable_occ' to a True value.</p>
+
+<h3>
+<a id="upgrading-from-094-to-10x" class="anchor" href="#upgrading-from-094-to-10x" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Upgrading From 0.9.4 to 1.0.x</h3>
+
+<p>If you are upgrading from version 0.9.4, or earlier, please note that version 0.9.4 is
+the last version with ascending as the declared ordering of 'event_id' in column family 'cql_stored_event'.
+Subsequent versions have the this ordering declared as descending. The change was made to support both paging
+through long histories of events and getting only recent events after a snapshot.</p>
+
+<p>A few things have been renamed, for example '@mutableproperty' is the new name for '@eventsourcedproperty'.
+This change was made to reflect the fact that immutable properties are also event sourced.</p>
+
+<p>The EventSourcedEntity class now has a property 'created_on', which replaces the attribute '_created_on'.
+This change follows from the fact that the domain events no longer have an floating point attribute 'timestamp'
+but instead a UUID attribute 'domain_event_id', which is set on an event sourced entity as '_initial_event_id'.
+That UUID value is used to generate the floating point timestamp value of the 'created_on' property.</p>
+
+<p>Please note, the mutator style has changed to use the <code>singledispatch</code> package. Mutators were implemented as a
+big if-elif-else block. Subclasses of EventSourcedEntity must implement a static method called _mutator() in
+order to have their own mutator function invoked when mutate() is called.</p>
+
+<p>There is a new method called _apply() on EventSourcedEntity, which makes operations that need to apply events
+have a suitably named method to call. The apply() method calls the mutate() class method, which is also used by the
+event source repository to replay events. The mutate() class method calls the static method _mutator() with the
+event and an initial state. So the static method _mutator is a good method to override in order to introduce
+a mutator for the class.</p>
+
+<p>Please see the Example class for details, and the documentation for singledispatch.</p>
+
+<p>Also, for Cassandra users, the table name for stored events has changed to 'stored_events'. The column names
+have changed to be single characters, for storage efficiency. Production data will need to be migrated.</p>
+
+<h2>
+<a id="background" class="anchor" href="#background" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Background</h2>
+
+<p>Although the event sourcing patterns are each quite simple, and they can be reproduced in code for each project,
+they do suggest cohesive mechanisms, for example applying and publishing the events generated within domain
+entities, storing and retrieving selections of the events in a highly scalable manner, replaying the stored
+events for a particular entity to obtain the current state, and projecting views of the event stream that are
+persisted in other models. Quoting from the "Cohesive Mechanism" pages in Eric Evan's Domain Driven Design book:</p>
+
+<p><em>"Therefore: Partition a conceptually COHESIVE MECHANISM into a separate lightweight framework. Particularly watch
+for formalisms for well-documented categories of algorithms. Expose the capabilities of the framework
+with an INTENTION-REVEALING INTERFACE. Now the other elements of the domain can focus on expressing the problem
+("what"), delegating the intricacies of the solution ("how") to the framework."</em></p>
+
+<p>The example usage (see above) introduces the "interface". The "intricacies" can be found in the source code.</p>
+
+<p>Inspiration:</p>
+
+<ul>
+<li>
+<p>Martin Fowler's article on event sourcing</p>
+
+<ul>
+<li><a href="http://martinfowler.com/eaaDev/EventSourcing.html">http://martinfowler.com/eaaDev/EventSourcing.html</a></li>
+</ul>
+</li>
+<li>
+<p>Greg Young's discussions about event sourcing, and EventStore system</p>
+
+<ul>
+<li><a href="https://www.youtube.com/watch?v=JHGkaShoyNs">https://www.youtube.com/watch?v=JHGkaShoyNs</a></li>
+<li><a href="https://www.youtube.com/watch?v=LDW0QWie21s">https://www.youtube.com/watch?v=LDW0QWie21s</a></li>
+<li><a href="https://dl.dropboxusercontent.com/u/9162958/CQRS/Events%20as%20a%20Storage%20Mechanism%20CQRS.pdf">https://dl.dropboxusercontent.com/u/9162958/CQRS/Events%20as%20a%20Storage%20Mechanism%20CQRS.pdf</a></li>
+<li><a href="https://geteventstore.com/">https://geteventstore.com/</a></li>
+</ul>
+</li>
+<li>
+<p>Robert Smallshire's brilliant example code on Bitbucket</p>
+
+<ul>
+<li><a href="https://bitbucket.org/sixty-north/d5-kanban-python/src">https://bitbucket.org/sixty-north/d5-kanban-python/src</a></li>
+</ul>
+</li>
+<li><p>Various professional projects that called for this approach, across which I didn't want to rewrite
+the same things each time</p></li>
+</ul>
+
+<p>See also:</p>
+
+<ul>
+<li>
+<p>'Evaluation of using NoSQL databases in an event sourcing system' by Johan Rothsberg</p>
+
+<ul>
+<li><a href="http://www.diva-portal.se/smash/get/diva2:877307/FULLTEXT01.pdf">http://www.diva-portal.se/smash/get/diva2:877307/FULLTEXT01.pdf</a></li>
+</ul>
+</li>
+<li>
+<p>Wikipedia page on Object-relational impedance mismatch</p>
+
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/Object-relational_impedance_mismatch">https://en.wikipedia.org/wiki/Object-relational_impedance_mismatch</a></li>
+</ul>
+</li>
+</ul>
+
+<h2>
+<a id="more-details-about-the-features" class="anchor" href="#more-details-about-the-features" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>More Details About the Features</h2>
+
+<ul>
+<li><p>Example application of event sourcing, with an example event sourced entity and example domain events, and with
+an example event sourced repository containing example entity instances, and an example entity factory method</p></li>
+<li>
+<p>Storage-specific event sourced application classes</p>
+
+<ul>
+<li><p>Base class for event sourced applications with SQLAlchemy</p></li>
+<li><p>Base class for event sourced applications with Cassandra</p></li>
+<li><p>Base class for event sourced applications with simple Python objects (non-persistent)</p></li>
+</ul>
+</li>
+<li><p>Base class for event sourced applications, which provides an event store and a persistence subscriber, but
+which requires subclasses to implement a method that provides a stored event repository instance</p></li>
+<li><p>Example event sourced entity</p></li>
+<li>
+<p>Base class for event sourced entities</p>
+
+<ul>
+<li><p>Basic domain events, to model basic "created", "attribute changed", and "discarded" entity events</p></li>
+<li><p>Mutator function, to apply a domain event to an entity, variously according to the type of the event</p></li>
+<li><p>Event sourced property decorator, to help declare simple event sourced properties</p></li>
+<li><p>A "discard" method which publishes the discarded event, to call when an entity is no longer wanted,</p></li>
+</ul>
+</li>
+<li><p>Domain event base class, to model events in a domain</p></li>
+<li><p>In-process publish-subscribe mechanism, for in-process domain event propagation</p></li>
+<li><p>Persistence subscriber class, to subscribe to locally published domain events and append them to an event store</p></li>
+<li><p>Example event sourced domain entity repository</p></li>
+<li><p>Base class for event sourced domain entity repositories</p></li>
+<li><p>Event player, to recover a domain entity for a given domain entity ID, using an event store and a mutator</p></li>
+<li>
+<p>Domain event store class</p>
+
+<ul>
+<li><p>Method to append a new domain event</p></li>
+<li><p>Method to get all the domain events for an entity</p></li>
+</ul>
+</li>
+<li>
+<p>Concrete stored event repository classes</p>
+
+<ul>
+<li><p>Stored event repository to persist stored event objects in a relational database, using SQLAlchemy (as an ORM)</p></li>
+<li><p>Stored event repository to persist stored events in Cassandra</p></li>
+<li><p>Stored event repository using simple Python objects (non-persistent)</p></li>
+</ul>
+</li>
+<li><p>Generic stored event class, to provide a form in which to persist domain events</p></li>
+<li><p>Function to get event topic from domain event class</p></li>
+<li><p>Function to resolve event topic into domain event class</p></li>
+<li><p>Function to serialize a domain event object to a stored event object</p></li>
+<li><p>Function to recreate a domain event object from a stored event object</p></li>
+<li>
+<p>Base class for stored event repositories</p>
+
+<ul>
+<li><p>Method to append a new stored event to the stored collection</p></li>
+<li><p>Method to get all stored events for given entity ID</p></li>
+<li><p>Method to get all stored events for given domain event topic</p></li>
+<li><p>Method to get single domain event for given event ID</p></li>
+</ul>
+</li>
+<li><p>Entity snapshots, to avoid replaying all events</p></li>
+<li><p>Method to get domain events for given entity ID, from given time</p></li>
+<li><p>Method to get domain events for given entity ID, until given time</p></li>
+<li><p>Method to get a limited number of domain events</p></li>
+<li><p>Generator that retrieves events in a succession of pages, emitting a
+continuous stream in ascending or descending order</p></li>
+<li><p>Time-bucketed logs, useful for accumulating an indefinite list of
+messages in an accessible manner</p></li>
+<li><p>Encrypted stored events, providing application level encryption</p></li>
+<li><p>Set-based collections</p></li>
+<li><p>Optimistic concurrency control</p></li>
+<li><p>Generalized suffix trees</p></li>
+</ul>
+
+<p>Todo: Develop above to be an API reference.</p>
+
+<h2>
+<a id="forthcoming-features" class="anchor" href="#forthcoming-features" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Forthcoming Features</h2>
+
+<ul>
+<li><p>List-based collections (forthcoming)</p></li>
+<li><p>Stored event repository to persist stored events in a file using a
+very simple file format (forthcoming)</p></li>
+<li><p>Stored event repository to persist stored events using MongoDB (forthcoming)</p></li>
+<li><p>Stored event repository to persist stored events using HBase (forthcoming)</p></li>
+<li><p>Stored event repository to persist stored events using DynamoDB (forthcoming)</p></li>
+<li><p>Method to delete all domain events for given domain entity ID (forthcoming)</p></li>
+<li><p>Method to get all domain events in the order they occurred (forthcoming)</p></li>
+<li><p>Storage retries and fallback strategies, to protect against failing to write an event (forthcoming)</p></li>
+<li><p>Subscriber that publishes domain events to RabbitMQ (forthcoming)</p></li>
+<li><p>Subscriber that publishes domain events to Amazon SQS (forthcoming)</p></li>
+<li><p>Republisher that subscribes to RabbitMQ and publishes domain events locally (forthcoming)</p></li>
+<li><p>Republisher that subscribers to Amazon SQS and publishes domain event locally (forthcoming)</p></li>
+<li><p>Linked pages of domain events ("Archived Log"), to allow event sourced projections easily to make sure they have
+all the events (forthcoming)</p></li>
+<li>
+<p>Base class for event sourced projections or views (forthcoming)</p>
+
+<ul>
+<li><p>In memory event sourced projection, which needs to replay entire event stream when system starts up (forthcoming)</p></li>
+<li><p>Persistent event sourced projection, which stored its projected state, but needs to replay entire event stream
+when initialized  (forthcoming)</p></li>
+</ul>
+</li>
+<li><p>Event sourced indexes, as persisted event source projections, to discover extant entity IDs (forthcoming)</p></li>
+<li><p>Event pointer, to refer to an event in a stream (forthcoming)</p></li>
+<li><p>Updating stored events, to support domain model migration (forthcoming)</p></li>
+<li><p>Something to store serialized event attribute values separately from the other event information, to prevent large
+attribute values inhibiting performance and stability - different sizes could be stored in different ways...
+(forthcoming)</p></li>
+<li>
+<p>Different kinds of stored event</p>
+
+<ul>
+<li>IDs generated from content, e.g. like Git (forthcoming)</li>
+<li>cryptographically signed stored events (forthcoming)</li>
+</ul>
+</li>
+<li><p>Branch and merge mechanism for domain events (forthcoming)</p></li>
+<li><p>Support for asynchronous I/O, with an application that uses an event loop (forthcoming)</p></li>
+<li><p>More examples (forthcoming)</p></li>
+<li><p>Great documentation! (forthcoming)</p></li>
+<li><p>Context maps (so we can use univerally unique IDs within a context,
+even though entities arise from other contexts and may not have
+universally unique IDs e.g. integer sequences)</p></li>
+<li><p>Optionally decouple topics from actual code, so classes can be moved.</p></li>
+</ul>
+
+<p>Todo: Develop above to be a release plan.</p>
+
+<h2>
+<a id="possible-future-backwards-incompatible-changes" class="anchor" href="#possible-future-backwards-incompatible-changes" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Possible Future Backwards-Incompatible Changes</h2>
+
+<ul>
+<li><p>Remove id_prefixes in stored entity ID, because it makes the code a
+bit complicated, since each domain event needs to know which entity
+class it is for, and that's not always desirable. This would involve
+internal code changes that probably wouldn't impact on applications
+using this package, however it would impact existing data. This
+change might not even be a good idea.</p></li>
+<li><p>Move base event classes off from abstract entity classes, so developers
+can't get confused with events defined on super classes that can't be
+retrieved from the event store, because they don't know which concrete
+class they pertain to, so can't be written with correct id prefixes.
+This would be a code change rather than a data migration thing. This
+wouldn't be an issue if we didn't use ID prefixes.</p></li>
+<li><p>Stored event repositories that primarily use version numbers instead
+of UUIDs to key and order stored events. This wouldn't be a backwards
+incompatible change, but an alternative transcoder and stored
+event repo.</p></li>
+</ul>
+
+<h2>
+<a id="project" class="anchor" href="#project" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Project</h2>
+
+<p>This project is hosted on GitHub.</p>
+
+<ul>
+<li><a href="https://github.com/johnbywater/eventsourcing">https://github.com/johnbywater/eventsourcing</a></li>
+</ul>
+
+<p>Questions, requests and any other issues can be registered here:</p>
+
+<ul>
+<li><a href="https://github.com/johnbywater/eventsourcing/issues">https://github.com/johnbywater/eventsourcing/issues</a></li>
+</ul>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/johnbywater/eventsourcing">Eventsourcing</a> is maintained by <a href="https://github.com/johnbywater">johnbywater</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
